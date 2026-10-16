@@ -1,0 +1,3 @@
+# per-instance eeprom, logs, terrain cache
+copter/run*/
+plane/run*/

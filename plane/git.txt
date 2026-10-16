@@ -1,0 +1,9 @@
+commit fbd0a3160c90a557c24ce4c38c16975532652536
+Author: Andrew Tridgell <andrew@tridgell.net>
+Date:   Sat Oct 3 17:20:32 2026 +1000
+
+    AP_BoardConfig: use atomic pin mode change for debug pins
+    
+    board_init_debug() runs after other threads have started, so use
+    stm32_set_line_mode() to avoid racing other pin mode changes on the
+    same port
