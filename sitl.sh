@@ -6,6 +6,8 @@
 #   ./sitl.sh copter --instance 1 --wipe
 #   ./sitl.sh copter --model hexa --home "37.4133,-121.9967,10,0"
 #   ./sitl.sh plane --home Woodley
+#   ./sitl.sh copter --swarm 5
+#   ./sitl.sh plane --swarm 3 --home Woodley --spacing 20
 #   ./sitl.sh copter -- --some-sitl-flag value     # args after -- go to the binary
 #
 # sitl.ps1-style flags work too: ./sitl.sh plane -Home Woodley -Speedup 5
@@ -27,8 +29,12 @@ Usage: $0 {copter|plane} [options] [-- extra SITL args]
   --home LOC        lat,lon,alt,hdg or a name from autotest/locations.txt (default: CMAC)
   --speedup N       simulation speedup (default: 1)
   --instance N      shifts all ports by 10*N; separate eeprom/logs in <vehicle>/runN (default: 0)
+  --swarm N         launch N vehicles (instances N0..N0+N-1, sysid = instance+1), lined up
+                    behind --home along its heading
+  --spacing M       metres between swarm vehicles (default: 10)
   --wipe            reset parameters/eeprom to defaults
-  --udp-out ADDR    extra MAVLink UDP stream (default: 127.0.0.1:14550+10N; '' to disable)
+  --udp-out ADDR    extra MAVLink UDP stream (default: 127.0.0.1:14550+10N, or
+                    127.0.0.1:14550 for every swarm vehicle; '' to disable)
   --wait-for-gcs    hold boot until a GCS connects on TCP
   --bin PATH        use this SITL binary instead of the downloaded one
   --update          re-download the Linux binary
@@ -51,6 +57,8 @@ shift
 location='-35.363261,149.165230,584,353'   # CMAC field (Canberra)
 speedup=1
 instance=0
+swarm=1
+spacing=10
 wipe=0
 wait_gcs=0
 udp_out=
@@ -71,6 +79,8 @@ while [[ $# -gt 0 ]]; do
     home|location)     need "$@"; location="$2"; shift 2 ;;
     speedup)           need "$@"; speedup="$2"; shift 2 ;;
     instance)          need "$@"; instance="$2"; shift 2 ;;
+    swarm)             need "$@"; swarm="$2"; shift 2 ;;
+    spacing)           need "$@"; spacing="$2"; shift 2 ;;
     udpout)            need "$@"; udp_out="$2"; udp_out_set=1; shift 2 ;;
     bin)               need "$@"; bin="$2"; shift 2 ;;
     wipe)              wipe=1; shift ;;
@@ -83,7 +93,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ "$instance" =~ ^[0-9]+$ ]] || die "--instance must be a non-negative integer"
-[[ $udp_out_set -eq 1 ]] || udp_out="127.0.0.1:$((14550 + 10 * instance))"
+[[ "$swarm" =~ ^[0-9]+$ ]] && (( swarm >= 1 && swarm <= 100 )) || die "--swarm must be 1..100"
+[[ "$spacing" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "--spacing must be a number of metres"
+if [[ $udp_out_set -eq 0 ]]; then
+  if (( swarm > 1 )); then udp_out=127.0.0.1:14550; else udp_out="127.0.0.1:$((14550 + 10 * instance))"; fi
+fi
 
 dir="$root/$vehicle"
 defaults="$dir/$vehicle.parm"
@@ -178,26 +192,89 @@ if [[ "$location" != *,* ]]; then
   location="$resolved"
 fi
 
-serial0=tcp:0
-[[ $wait_gcs -eq 1 ]] && serial0=tcp:0:wait
-args=(-M "$model" -O "$location" -s "$speedup" -I "$instance" --defaults "$defaults" --serial0 "$serial0")
-[[ $wipe -eq 1 ]] && args+=(-w)
-[[ -n "$udp_out" ]] && args+=(--serial1 "udpclient:$udp_out")
-args+=(${extra[@]+"${extra[@]}"})
+# Home of swarm member $1: $1*spacing metres behind --home, along its heading.
+swarm_home() {
+  [[ $1 -eq 0 ]] && { echo "$location"; return; }
+  awk -v loc="$location" -v d="$(( -$1 ))" -v sp="$spacing" 'BEGIN {
+    n = split(loc, p, ","); alt = (n > 2) ? p[3] : 0; hdg = (n > 3) ? p[4] : 0
+    pi = atan2(0, -1); h = hdg * pi / 180; d *= sp
+    lat = p[1] + d * cos(h) / 111319.5
+    lon = p[2] + d * sin(h) / (111319.5 * cos(p[1] * pi / 180))
+    printf "%.7f,%.7f,%s,%s\n", lat, lon, alt, hdg
+  }'
+}
+
+# Sets args=() for instance $1 at home $2, with MAVLink sysid $3 (0 = leave as is).
+sitl_args() {
+  local serial0=tcp:0
+  [[ $wait_gcs -eq 1 ]] && serial0=tcp:0:wait
+  args=(-M "$model" -O "$2" -s "$speedup" -I "$1" --defaults "$defaults" --serial0 "$serial0")
+  [[ $3 -ne 0 ]] && args+=(--sysid "$3")
+  [[ $wipe -eq 1 ]] && args+=(-w)
+  [[ -n "$udp_out" ]] && args+=(--serial1 "udpclient:$udp_out")
+  args+=(${extra[@]+"${extra[@]}"})
+}
 
 # eeprom.bin, logs and terrain land in the working directory, so keep one per instance.
-run_dir="$dir/run$instance"
-mkdir -p "$run_dir"
+run_dir_for() { run_dir="$dir/run$1"; mkdir -p "$run_dir"; }
 
-tcp=$((5760 + 10 * instance))
-printf '\033[36mArduPilot SITL: %s (model %s), instance %s\033[0m\n' "$vehicle" "$model" "$instance"
-echo "  Home        : $location"
-echo "  MAVLink TCP : 127.0.0.1:$tcp (SERIAL0)"
-[[ -n "$udp_out" ]] && echo "  MAVLink UDP : sending to $udp_out (SERIAL1)"
-echo "  Run dir     : $run_dir"
-echo "  Binary      : $bin"
-echo "  Ctrl+C to stop"
+if (( swarm == 1 )); then
+  sitl_args "$instance" "$location" 0
+  run_dir_for "$instance"
+  tcp=$((5760 + 10 * instance))
+  printf '\033[36mArduPilot SITL: %s (model %s), instance %s\033[0m\n' "$vehicle" "$model" "$instance"
+  echo "  Home        : $location"
+  echo "  MAVLink TCP : 127.0.0.1:$tcp (SERIAL0)"
+  [[ -n "$udp_out" ]] && echo "  MAVLink UDP : sending to $udp_out (SERIAL1)"
+  echo "  Run dir     : $run_dir"
+  echo "  Binary      : $bin"
+  echo "  Ctrl+C to stop"
+  echo
+  cd "$run_dir"
+  exec "$bin" "${args[@]}"
+fi
+
+# Swarm: start every vehicle in the background, logging to its run dir.
+pids=()
+insts=()
+stop_all() {
+  trap - INT TERM EXIT
+  for pid in ${pids[@]+"${pids[@]}"}; do kill "$pid" 2>/dev/null || true; done
+  wait 2>/dev/null || true
+}
+trap 'stop_all; exit 130' INT TERM
+trap stop_all EXIT
+
+printf '\033[36mArduPilot SITL swarm: %s x %s (model %s), %s m apart along home heading\033[0m\n' \
+  "$swarm" "$vehicle" "$model" "$spacing"
+[[ -n "$udp_out" ]] && echo "  MAVLink UDP : all vehicles sending to $udp_out (SERIAL1)"
+echo
+printf '  %-4s %-6s %-16s %s\n' inst sysid TCP home
+for (( k = 0; k < swarm; k++ )); do
+  inst=$((instance + k))
+  home="$(swarm_home "$k")"
+  sitl_args "$inst" "$home" $((inst + 1))
+  run_dir_for "$inst"
+  ( cd "$run_dir" && exec "$bin" "${args[@]}" ) > "$run_dir/sitl.log" 2>&1 < /dev/null &
+  pids+=($!)
+  insts+=("$inst")
+  printf '  %-4s %-6s %-16s %s\n' "$inst" $((inst + 1)) "127.0.0.1:$((5760 + 10 * inst))" "$home"
+done
+echo
+echo "  Logs: $vehicle/runN/sitl.log   Ctrl+C to stop all"
 echo
 
-cd "$run_dir"
-exec "$bin" "${args[@]}"
+declare -A reported=()
+while :; do
+  sleep 1
+  alive=0
+  for i in "${!pids[@]}"; do
+    if kill -0 "${pids[$i]}" 2>/dev/null; then
+      alive=$((alive + 1))
+    elif [[ -z "${reported[$i]:-}" ]]; then
+      reported[$i]=1
+      printf '\033[33m  instance %s exited; see %s\033[0m\n' "${insts[$i]}" "$dir/run${insts[$i]}/sitl.log"
+    fi
+  done
+  (( alive > 0 )) || break
+done

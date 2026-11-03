@@ -25,6 +25,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 .\sitl.ps1 copter
 .\sitl.ps1 plane -Home Woodley
 .\sitl.ps1 copter -Instance 1 -Speedup 5 -Wipe
+.\sitl.ps1 copter -Swarm 5
 ```
 
 ## Linux (bash)
@@ -36,6 +37,7 @@ cd ardupilot-sitl
 ./sitl.sh copter
 ./sitl.sh plane --home Woodley
 ./sitl.sh copter --instance 1 --speedup 5 --wipe
+./sitl.sh copter --swarm 5
 ```
 
 ## Options
@@ -46,13 +48,34 @@ cd ardupilot-sitl
 | `-Home` | `--home` | CMAC | `lat,lon,alt,hdg` or a name from `autotest/locations.txt` |
 | `-Speedup` | `--speedup` | 1 | |
 | `-Instance N` | `--instance N` | 0 | shifts all ports by 10*N; separate eeprom/logs in `<vehicle>/runN` |
+| `-Swarm N` | `--swarm N` | 1 | launch N vehicles at once (see [Swarms](#swarms)) |
+| `-Spacing M` | `--spacing M` | 10 | metres between swarm vehicles |
 | `-Wipe` | `--wipe` | | reset params to defaults |
 | `-WaitForGcs` | `--wait-for-gcs` | | hold boot until something connects on TCP |
-| `-UdpOut` | `--udp-out` | `127.0.0.1:14550+10N` | `''` to disable |
+| `-UdpOut` | `--udp-out` | `127.0.0.1:14550+10N` (swarm: `127.0.0.1:14550` for all) | `''` to disable |
 | `-ExtraArgs a,b` | `-- a b` | | passed straight to the SITL binary |
 | | `--bin PATH` | downloaded binary | use your own build, e.g. `ardupilot/build/sitl/bin/arducopter` |
 | | `--update` | | re-download the Linux binary |
 | | `--build` | | build the Linux binary from source (automatic on aarch64) |
+
+## Swarms
+
+`-Swarm N` / `--swarm N` starts N vehicles from one command:
+
+- instances `I .. I+N-1` (`I` = `-Instance`, default 0), each with its own ports, eeprom and `<vehicle>/runN`
+- MAVLink system ID = instance + 1, so a GCS shows them as separate vehicles
+- vehicle 0 at `-Home`, the rest lined up behind it along the home heading, `-Spacing` (10 m) apart,
+  all facing the home heading (on a runway location like `Woodley`, planes line up on the runway)
+- all vehicles send MAVLink to UDP `127.0.0.1:14550`, so one GCS (QGroundControl, Mission Planner) sees the
+  whole swarm; vehicle N is also on TCP `5760+10N`
+- output goes to `<vehicle>/runN/sitl.log`; Ctrl+C stops every vehicle
+
+```bash
+./sitl.sh plane --swarm 3 --home Woodley --spacing 20
+```
+
+Running several separate `--instance N` launches by hand also works, but they all share sysid 1 and spawn on
+the same spot unless you pass `-- --sysid N` and different `--home` values.
 
 ## Connecting
 
