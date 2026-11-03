@@ -1,7 +1,17 @@
-# ArduPilot SITL (Windows, prebuilt)
+# ArduPilot SITL (prebuilt, Windows + Linux)
 
-Official Cygwin SITL builds from `firmware.ardupilot.org/Tools/MissionPlanner/sitl/{CopterStable,PlaneStable}`
-(commit in `copter/git.txt`, `plane/git.txt`), with default params from the same commit.
+Run ArduPilot Copter or Plane SITL without building anything: clone, run one script, connect a GCS.
+
+- **Windows**: `sitl.ps1` runs the bundled official Cygwin SITL builds from
+  `firmware.ardupilot.org/Tools/MissionPlanner/sitl/{CopterStable,PlaneStable}`
+  (commit in `copter/git.txt`, `plane/git.txt`).
+- **Linux**: `sitl.sh` downloads the official Linux SITL build from
+  `firmware.ardupilot.org/{Copter,Plane}/stable/SITL_x86_64_linux_gnu` (or `SITL_arm_linux_gnueabihf`)
+  into `copter/` / `plane/` on first run (commit saved to `<vehicle>/git-linux.txt`). Needs `curl` or `wget`.
+
+Both scripts use the same default params (`copter/copter.parm`, `plane/plane.parm`), ports and run directories.
+
+## Windows (PowerShell)
 
 ```powershell
 git clone https://github.com/MohammadAdib/ardupilot-sitl
@@ -14,16 +24,41 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 .\sitl.ps1 copter -Instance 1 -Speedup 5 -Wipe
 ```
 
-| Option | Default | |
-|---|---|---|
-| `-Model` | `quad` / `plane` | any SITL model, e.g. `hexa`, `octa`, `quadplane` |
-| `-Home` | CMAC | `lat,lon,alt,hdg` or a name from `autotest\locations.txt` |
-| `-Speedup` | 1 | |
-| `-Instance N` | 0 | shifts all ports by 10*N; separate eeprom/logs in `<vehicle>\runN` |
-| `-Wipe` | | reset params to defaults |
-| `-WaitForGcs` | | hold boot until something connects on TCP |
-| `-UdpOut` | `127.0.0.1:14550+10N` | `''` to disable |
+## Linux (bash)
 
-Connect a GCS to TCP `127.0.0.1:5760` (+10N) or listen on UDP `14550` (+10N). Also TCP 5763 is SERIAL2.
+```bash
+git clone https://github.com/MohammadAdib/ardupilot-sitl
+cd ardupilot-sitl
 
-Named locations are resolved by `sitl.ps1` itself: the binary only reads the `locations.txt` compiled into it.
+./sitl.sh copter
+./sitl.sh plane --home Woodley
+./sitl.sh copter --instance 1 --speedup 5 --wipe
+```
+
+## Options
+
+| Windows | Linux | Default | |
+|---|---|---|---|
+| `-Model` | `--model` | `quad` / `plane` | any SITL model, e.g. `hexa`, `octa`, `quadplane` |
+| `-Home` | `--home` | CMAC | `lat,lon,alt,hdg` or a name from `autotest/locations.txt` |
+| `-Speedup` | `--speedup` | 1 | |
+| `-Instance N` | `--instance N` | 0 | shifts all ports by 10*N; separate eeprom/logs in `<vehicle>/runN` |
+| `-Wipe` | `--wipe` | | reset params to defaults |
+| `-WaitForGcs` | `--wait-for-gcs` | | hold boot until something connects on TCP |
+| `-UdpOut` | `--udp-out` | `127.0.0.1:14550+10N` | `''` to disable |
+| `-ExtraArgs a,b` | `-- a b` | | passed straight to the SITL binary |
+| | `--bin PATH` | downloaded binary | use your own build, e.g. `ardupilot/build/sitl/bin/arducopter` |
+| | `--update` | | re-download the Linux binary |
+
+## Connecting
+
+Connect a GCS to TCP `127.0.0.1:5760` (+10N) or listen on UDP `14550` (+10N). TCP 5763 (+10N) is SERIAL2.
+
+Named locations are resolved by the scripts themselves: the binary only reads the `locations.txt` compiled into it.
+
+## Notes
+
+- The Linux "stable" build may be a different commit from the bundled Windows build; check `git.txt` against `git-linux.txt`.
+- No prebuilt Linux SITL exists for other architectures (e.g. aarch64). Build one from
+  [ArduPilot](https://github.com/ArduPilot/ardupilot) with `./waf configure --board sitl && ./waf copter` and pass `--bin`.
+- Inside WSL, use `sitl.sh` (native Linux build); from Windows itself, use `sitl.ps1`.

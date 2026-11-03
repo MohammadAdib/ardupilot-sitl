@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
   Launch ArduPilot SITL (prebuilt Windows binaries) for copter or plane.
+  On Linux use ./sitl.sh instead (same options, GNU-style: --home, --speedup, ...).
 
 .EXAMPLE
   .\sitl.ps1 copter

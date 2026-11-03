@@ -1,3 +1,8 @@
 # per-instance eeprom, logs, terrain cache
 copter/run*/
 plane/run*/
+# Linux SITL binaries downloaded by sitl.sh
+copter/arducopter
+plane/arduplane
+*/git-linux.txt
+*.tmp
