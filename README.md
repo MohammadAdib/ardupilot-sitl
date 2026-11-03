@@ -64,7 +64,7 @@ cd ardupilot-sitl
 
 - instances `I .. I+N-1` (`I` = `-Instance`, default 0), each with its own ports, eeprom and `<vehicle>/runN`
 - MAVLink system ID = instance + 1, so a GCS shows them as separate vehicles
-- vehicle 0 at `-Home`, the rest lined up behind it along the home heading, `-Spacing` (10 m) apart,
+- vehicle 0 at `-Home`, the rest lined up ahead of it along the home heading, `-Spacing` (10 m) apart,
   all facing the home heading (on a runway location like `Woodley`, planes line up on the runway)
 - all vehicles send MAVLink to UDP `127.0.0.1:14550`, so one GCS (QGroundControl, Mission Planner) sees the
   whole swarm; vehicle N is also on TCP `5760+10N`

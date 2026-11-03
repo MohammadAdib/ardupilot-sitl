@@ -31,7 +31,7 @@ param(
   [int]$Instance = 0,
 
   # Launch N vehicles (instances Instance..Instance+N-1, MAVLink sysid = instance+1),
-  # lined up behind -Home along its heading, -Spacing metres apart.
+  # lined up ahead of -Home along its heading, -Spacing metres apart.
   [ValidateRange(1, 100)]
   [int]$Swarm = 1,
 
@@ -70,7 +70,7 @@ if ($Location -notmatch ',') {
   $Location = ($line -split '=', 2)[1].Trim()
 }
 
-# Home of swarm member $k: $k*Spacing metres behind -Home, along its heading.
+# Home of swarm member $k: $k*Spacing metres ahead of -Home, along its heading.
 function Get-SwarmHome([int]$k) {
   if ($k -eq 0) { return $Location }
   $p = $Location -split ','
@@ -78,7 +78,7 @@ function Get-SwarmHome([int]$k) {
   $alt = if ($p.Count -gt 2) { $p[2] } else { '0' }
   $hdg = if ($p.Count -gt 3) { $p[3] } else { '0' }
   $h = [double]::Parse($hdg, $inv) * [math]::PI / 180
-  $d = -$k * $Spacing
+  $d = $k * $Spacing
   $lat2 = $lat + $d * [math]::Cos($h) / 111319.5
   $lon2 = $lon + $d * [math]::Sin($h) / (111319.5 * [math]::Cos($lat * [math]::PI / 180))
   [string]::Format($inv, '{0:F7},{1:F7},{2},{3}', $lat2, $lon2, $alt, $hdg)

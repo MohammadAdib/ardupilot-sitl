@@ -30,7 +30,7 @@ Usage: $0 {copter|plane} [options] [-- extra SITL args]
   --speedup N       simulation speedup (default: 1)
   --instance N      shifts all ports by 10*N; separate eeprom/logs in <vehicle>/runN (default: 0)
   --swarm N         launch N vehicles (instances N0..N0+N-1, sysid = instance+1), lined up
-                    behind --home along its heading
+                    ahead of --home along its heading
   --spacing M       metres between swarm vehicles (default: 10)
   --wipe            reset parameters/eeprom to defaults
   --udp-out ADDR    extra MAVLink UDP stream (default: 127.0.0.1:14550+10N, or
@@ -192,10 +192,10 @@ if [[ "$location" != *,* ]]; then
   location="$resolved"
 fi
 
-# Home of swarm member $1: $1*spacing metres behind --home, along its heading.
+# Home of swarm member $1: $1*spacing metres ahead of --home, along its heading.
 swarm_home() {
   [[ $1 -eq 0 ]] && { echo "$location"; return; }
-  awk -v loc="$location" -v d="$(( -$1 ))" -v sp="$spacing" 'BEGIN {
+  awk -v loc="$location" -v d="$1" -v sp="$spacing" 'BEGIN {
     n = split(loc, p, ","); alt = (n > 2) ? p[3] : 0; hdg = (n > 3) ? p[4] : 0
     pi = atan2(0, -1); h = hdg * pi / 180; d *= sp
     lat = p[1] + d * cos(h) / 111319.5
