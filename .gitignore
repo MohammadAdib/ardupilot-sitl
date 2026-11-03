@@ -6,3 +6,6 @@ copter/arducopter
 plane/arduplane
 */git-linux.txt
 *.tmp
+
+# ArduPilot source tree used by sitl.sh to build on aarch64
+.build/

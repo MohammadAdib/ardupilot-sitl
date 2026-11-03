@@ -8,6 +8,9 @@ Run ArduPilot Copter or Plane SITL without building anything: clone, run one scr
 - **Linux**: `sitl.sh` downloads the official Linux SITL build from
   `firmware.ardupilot.org/{Copter,Plane}/stable/SITL_x86_64_linux_gnu` (or `SITL_arm_linux_gnueabihf`)
   into `copter/` / `plane/` on first run (commit saved to `<vehicle>/git-linux.txt`). Needs `curl` or `wget`.
+- **Raspberry Pi 5 / 64-bit ARM Linux**: there is no official prebuilt, so `sitl.sh` builds the binary from
+  ArduPilot source on first run, at the same commit as the Windows binaries (one-time, roughly 15-60 min
+  depending on the board). Needs `sudo apt install git python3 python3-venv g++ make`.
 
 Both scripts use the same default params (`copter/copter.parm`, `plane/plane.parm`), ports and run directories.
 
@@ -49,6 +52,7 @@ cd ardupilot-sitl
 | `-ExtraArgs a,b` | `-- a b` | | passed straight to the SITL binary |
 | | `--bin PATH` | downloaded binary | use your own build, e.g. `ardupilot/build/sitl/bin/arducopter` |
 | | `--update` | | re-download the Linux binary |
+| | `--build` | | build the Linux binary from source (automatic on aarch64) |
 
 ## Connecting
 
@@ -59,6 +63,6 @@ Named locations are resolved by the scripts themselves: the binary only reads th
 ## Notes
 
 - The Linux "stable" build may be a different commit from the bundled Windows build; check `git.txt` against `git-linux.txt`.
-- No prebuilt Linux SITL exists for other architectures (e.g. aarch64). Build one from
-  [ArduPilot](https://github.com/ArduPilot/ardupilot) with `./waf configure --board sitl && ./waf copter` and pass `--bin`.
+- The source build lives in `.build/ardupilot`; if it is interrupted, rerun the same command to resume.
+- `sitl.sh` also accepts the `sitl.ps1` spellings (`-Home`, `-Speedup`, `-WaitForGcs`, ...).
 - Inside WSL, use `sitl.sh` (native Linux build); from Windows itself, use `sitl.ps1`.
