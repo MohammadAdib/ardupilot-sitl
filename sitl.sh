@@ -4,6 +4,7 @@
 #   ./sitl.sh copter
 #   ./sitl.sh plane --speedup 5
 #   ./sitl.sh copter --instance 1 --wipe
+#   ./sitl.sh copter --log
 #   ./sitl.sh copter --model hexa --home "37.4133,-121.9967,10,0"
 #   ./sitl.sh plane --home Woodley
 #   ./sitl.sh copter --swarm 5
@@ -33,6 +34,7 @@ Usage: $0 {copter|plane} [options] [-- extra SITL args]
                     ahead of --home along its heading
   --spacing M       metres between swarm vehicles (default: 10)
   --wipe            reset parameters/eeprom to defaults
+  --log             write dataflash logs (.BIN) to <vehicle>/runN/logs (default: off)
   --udp-out ADDR    extra MAVLink UDP stream (default: 127.0.0.1:14550+10N, or
                     127.0.0.1:14550 for every swarm vehicle; '' to disable)
   --wait-for-gcs    hold boot until a GCS connects on TCP
@@ -60,6 +62,7 @@ instance=0
 swarm=1
 spacing=10
 wipe=0
+log=0
 wait_gcs=0
 udp_out=
 udp_out_set=0
@@ -84,6 +87,7 @@ while [[ $# -gt 0 ]]; do
     udpout)            need "$@"; udp_out="$2"; udp_out_set=1; shift 2 ;;
     bin)               need "$@"; bin="$2"; shift 2 ;;
     wipe)              wipe=1; shift ;;
+    log)               log=1; shift ;;
     waitforgcs)        wait_gcs=1; shift ;;
     update)            update=1; shift ;;
     build)             build=1; shift ;;
@@ -101,6 +105,8 @@ fi
 
 dir="$root/$vehicle"
 defaults="$dir/$vehicle.parm"
+# SITL takes a comma-separated list of defaults files; nolog.parm sets LOG_BACKEND_TYPE 0.
+[[ $log -eq 1 ]] || defaults+=",$root/nolog.parm"
 
 download() {
   local plat="$1" url
@@ -228,6 +234,7 @@ if (( swarm == 1 )); then
   [[ -n "$udp_out" ]] && echo "  MAVLink UDP : sending to $udp_out (SERIAL1)"
   echo "  Run dir     : $run_dir"
   echo "  Binary      : $bin"
+  if [[ $log -eq 1 ]]; then echo "  Logging     : on ($run_dir/logs)"; else echo "  Logging     : off (--log to enable)"; fi
   echo "  Ctrl+C to stop"
   echo
   cd "$run_dir"
@@ -248,6 +255,7 @@ trap stop_all EXIT
 printf '\033[36mArduPilot SITL swarm: %s x %s (model %s), %s m apart along home heading\033[0m\n' \
   "$swarm" "$vehicle" "$model" "$spacing"
 [[ -n "$udp_out" ]] && echo "  MAVLink UDP : all vehicles sending to $udp_out (SERIAL1)"
+if [[ $log -eq 1 ]]; then echo "  Logging     : on ($vehicle/runN/logs)"; else echo "  Logging     : off (--log to enable)"; fi
 echo
 printf '  %-4s %-6s %-16s %s\n' inst sysid TCP home
 for (( k = 0; k < swarm; k++ )); do

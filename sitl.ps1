@@ -7,6 +7,7 @@
   .\sitl.ps1 copter
   .\sitl.ps1 plane -Speedup 5
   .\sitl.ps1 copter -Instance 1 -Wipe
+  .\sitl.ps1 copter -Log
   .\sitl.ps1 copter -Model hexa -Home "37.4133,-121.9967,10,0"
   .\sitl.ps1 plane -Home Woodley
   .\sitl.ps1 copter -Swarm 5
@@ -40,6 +41,9 @@ param(
   # Reset parameters/eeprom to defaults.
   [switch]$Wipe,
 
+  # Write dataflash logs (.BIN) to <vehicle>\runN\logs. Off by default: they grow by tens of MB per flight.
+  [switch]$Log,
+
   # Extra UDP stream for GCS apps that listen on 14550. Default: 127.0.0.1:14550+10*Instance,
   # or 127.0.0.1:14550 for every vehicle of a swarm (one GCS sees all). Set to '' to disable.
   [string]$UdpOut,
@@ -56,6 +60,8 @@ $inv = [cultureinfo]::InvariantCulture
 $dir = Join-Path $PSScriptRoot $Vehicle
 $exe = Join-Path $dir $(if ($Vehicle -eq 'copter') { 'ArduCopter.exe' } else { 'ArduPlane.exe' })
 $defaults = Join-Path $dir "$Vehicle.parm"
+# SITL takes a comma-separated list of defaults files; nolog.parm sets LOG_BACKEND_TYPE 0.
+if (-not $Log) { $defaults += ',' + (Join-Path $PSScriptRoot 'nolog.parm') }
 if (-not $Model) { $Model = if ($Vehicle -eq 'copter') { 'quad' } else { 'plane' } }
 if (-not $PSBoundParameters.ContainsKey('UdpOut')) {
   $UdpOut = if ($Swarm -gt 1) { '127.0.0.1:14550' } else { "127.0.0.1:$(14550 + 10 * $Instance)" }
@@ -108,6 +114,7 @@ if ($Swarm -eq 1) {
   Write-Host "  MAVLink TCP : 127.0.0.1:$tcp (SERIAL0)"
   if ($UdpOut) { Write-Host "  MAVLink UDP : sending to $UdpOut (SERIAL1)" }
   Write-Host "  Run dir     : $runDir"
+  Write-Host "  Logging     : $(if ($Log) { "on ($runDir\logs)" } else { 'off (-Log to enable)' })"
   Write-Host "  Ctrl+C to stop`n"
 
   $sitlArgs = Get-SitlArgs $Instance $Location 0
@@ -121,6 +128,7 @@ function Format-Arg([string]$s) { if ($s -match '[\s"]' -or $s -eq '') { '"' + (
 
 Write-Host "ArduPilot SITL swarm: $Swarm x $Vehicle (model $Model), $Spacing m apart along home heading" -ForegroundColor Cyan
 if ($UdpOut) { Write-Host "  MAVLink UDP : all vehicles sending to $UdpOut (SERIAL1)" }
+Write-Host "  Logging     : $(if ($Log) { "on ($Vehicle\runN\logs)" } else { 'off (-Log to enable)' })"
 Write-Host ''
 Write-Host ('  {0,-4} {1,-6} {2,-16} {3}' -f 'inst', 'sysid', 'TCP', 'home')
 $procs = @()

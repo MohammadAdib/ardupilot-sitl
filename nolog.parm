@@ -1,0 +1,2 @@
+# Loaded after <vehicle>.parm unless -Log / --log is given: no dataflash (.BIN) logs.
+LOG_BACKEND_TYPE 0

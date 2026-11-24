@@ -25,6 +25,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 .\sitl.ps1 copter
 .\sitl.ps1 plane -Home Woodley
 .\sitl.ps1 copter -Instance 1 -Speedup 5 -Wipe
+.\sitl.ps1 copter -Log
 .\sitl.ps1 copter -Swarm 5
 ```
 
@@ -37,6 +38,7 @@ cd ardupilot-sitl
 ./sitl.sh copter
 ./sitl.sh plane --home Woodley
 ./sitl.sh copter --instance 1 --speedup 5 --wipe
+./sitl.sh copter --log
 ./sitl.sh copter --swarm 5
 ```
 
@@ -51,6 +53,7 @@ cd ardupilot-sitl
 | `-Swarm N` | `--swarm N` | 1 | launch N vehicles at once (see [Swarms](#swarms)) |
 | `-Spacing M` | `--spacing M` | 10 | metres between swarm vehicles |
 | `-Wipe` | `--wipe` | | reset params to defaults |
+| `-Log` | `--log` | off | write dataflash logs (`.BIN`) to `<vehicle>/runN/logs`; off by default since they grow by tens of MB per flight |
 | `-WaitForGcs` | `--wait-for-gcs` | | hold boot until something connects on TCP |
 | `-UdpOut` | `--udp-out` | `127.0.0.1:14550+10N` (swarm: `127.0.0.1:14550` for all) | `''` to disable |
 | `-ExtraArgs a,b` | `-- a b` | | passed straight to the SITL binary |
@@ -85,6 +88,9 @@ Named locations are resolved by the scripts themselves: the binary only reads th
 
 ## Notes
 
+- Dataflash logging is off by default: unless `-Log` / `--log` is given, the scripts also load `nolog.parm`
+  (`LOG_BACKEND_TYPE 0`), so nothing is written to `<vehicle>/runN/logs`. A `LOG_BACKEND_TYPE` you set from a GCS
+  is saved to eeprom and takes precedence; `-Wipe` clears it.
 - The Linux "stable" build may be a different commit from the bundled Windows build; check `git.txt` against `git-linux.txt`.
 - The source build lives in `.build/ardupilot`; if it is interrupted, rerun the same command to resume.
 - `sitl.sh` also accepts the `sitl.ps1` spellings (`-Home`, `-Speedup`, `-WaitForGcs`, ...).
